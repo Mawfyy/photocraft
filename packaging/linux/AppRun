@@ -23,6 +23,12 @@ integrate() {
   appimage="${APPIMAGE:-}"
   [ -n "$appimage" ] && [ -f "$appimage" ] || return 0
   appimage="$(readlink -f "$appimage")" || return 0
+  # Exec= is parsed by the desktop: a path holding a quote, backquote, dollar, backslash,
+  # percent or a line break would need escaping (or could add lines), so skip integration.
+  case "$appimage" in
+    *[\"\`\$\\%]* | *'
+'*) return 0 ;;
+  esac
   home="${HOME:-}"
   [ -n "$home" ] || return 0
   data="${XDG_DATA_HOME:-$home/.local/share}"

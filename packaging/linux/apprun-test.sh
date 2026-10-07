@@ -87,4 +87,12 @@ rm -rf "$XDG_DATA_HOME"
 env -u APPIMAGE "$APPDIR/AppRun" >/dev/null || fail "extracted-AppDir launch exited non-zero"
 [ ! -e "$XDG_DATA_HOME" ] || fail "integrated without $APPIMAGE"
 
+# 9. A path that would need Exec escaping (here a `$`): launch only, nothing installed.
+rm -rf "$XDG_DATA_HOME"
+odd="$TMP/odd\$(id).AppImage"
+: >"$odd"
+out="$(APPIMAGE="$odd" "$APPDIR/AppRun" x)" || fail "launch with an odd path exited non-zero"
+[ "$out" = "stub: x" ] || fail "odd path: $out"
+[ ! -e "$XDG_DATA_HOME" ] || fail "integrated an AppImage path that needs escaping"
+
 echo "AppRun desktop integration ok"
