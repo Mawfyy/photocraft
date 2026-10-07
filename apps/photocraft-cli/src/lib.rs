@@ -42,6 +42,20 @@ struct Args {
     flags: Vec<(String, Option<String>)>,
 }
 
+fn allowed_flags(cmd: &str) -> Option<&'static [&'static str]> {
+    match cmd {
+        "convert" => Some(&["--format", "--quality"]),
+        "info" => Some(&["--compact"]),
+        "run" => Some(&["--new", "--cmd", "--params", "--out", "--format", "--quality"]),
+        "batch" => Some(&["--actions", "--in", "--out", "--format", "--quality"]),
+        "droplet" => Some(&["--out"]),
+        "commands" => Some(&["--json", "--filter"]),
+        "mcp" => Some(&["--bridge", "--control-token", "--control-token-file", "--automation-read-root", "--automation-write-root"]),
+        "serve" => Some(&["--port", "--control-token", "--control-token-file", "--automation-read-root", "--automation-write-root"]),
+        _ => None,
+    }
+}
+
 const VALUE_FLAGS: &[&str] = &[
     "--format",
     "--quality",
@@ -59,7 +73,6 @@ const VALUE_FLAGS: &[&str] = &[
     "--automation-read-root",
     "--automation-write-root",
 ];
-
 fn parse(args: &[String]) -> Result<Args, String> {
     let mut a = Args { positional: Vec::new(), flags: Vec::new() };
     let mut i = 0;
@@ -98,6 +111,22 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> i32 {
         let _ = write!(err, "{USAGE}");
         return 2;
     };
+    match cmd.as_str() {
+        "-h" | "--help" | "help" => {
+            let _ = write!(out, "{USAGE}");
+            return 0;
+        }
+        "--version" | "version" => {
+            let _ = writeln!(out, "photocraft-cli {}", photocraft_engine::build_info::long_version());
+            return 0;
+        }
+        _ => {}
+    }
+    const SUBCOMMANDS: &[&str] = &["convert", "info", "run", "batch", "droplet", "commands", "mcp", "serve"];
+    if SUBCOMMANDS.contains(&cmd.as_str()) && args[1..].iter().any(|a| a == "--help" || a == "-h") {
+        let _ = write!(out, "{USAGE}");
+        return 0;
+    }
     let parsed = match parse(&args[1..]) {
         Ok(p) => p,
         Err(e) => {
@@ -105,6 +134,15 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> i32 {
             return 2;
         }
     };
+    if let Some(allowed) = allowed_flags(cmd.as_str()) {
+        for (flag, _) in &parsed.flags {
+            if !allowed.contains(&flag.as_str()) {
+                let _ = writeln!(err, "error: unknown flag {} for {}", flag, cmd);
+                let _ = writeln!(err, "\n{USAGE}");
+                return 2;
+            }
+        }
+    }
     let r = match cmd.as_str() {
         "convert" => convert(&parsed, out, err),
         "info" => info(&parsed, out),
@@ -114,14 +152,6 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> i32 {
         "droplet" => droplet(&parsed, out, err),
         "mcp" => mcp(&parsed),
         "serve" => serve(&parsed, err),
-        "-h" | "--help" | "help" => {
-            let _ = write!(out, "{USAGE}");
-            return 0;
-        }
-        "--version" | "version" => {
-            let _ = writeln!(out, "photocraft-cli {}", photocraft_engine::build_info::long_version());
-            return 0;
-        }
         other => {
             let _ = writeln!(err, "error: unknown command `{other}`\n\n{USAGE}");
             return 2;
@@ -381,4 +411,99 @@ fn mcp(a: &Args) -> R {
     };
     let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().map_err(|e| e.to_string())?;
     rt.block_on(server.serve_stdio()).map_err(|e| e.to_string())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run_args(args: &[&str]) -> (i32, String, String) {
+        let args: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let code = run(&args, &mut out, &mut err);
+        (code, String::from_utf8_lossy(&out).into_owned(), String::from_utf8_lossy(&err).into_owned())
+    }
+
+    #[test]
+    fn subcommand_help_exits_zero() {
+        for cmd in ["convert", "info", "run", "batch", "droplet", "commands", "mcp", "serve"] {
+            for flag in ["--help", "-h"] {
+                let (code, out, err) = run_args(&[cmd, flag]);
+                assert_eq!(code, 0, "{cmd} {flag} code");
+                assert!(out.contains("USAGE"), "{cmd} {flag} out");
+                assert!(err.is_empty(), "{cmd} {flag} err not empty: {err}");
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_unknown_flags() {
+        let (code, _, err) = run_args(&["batch", "--actions", "a.json", "--in", "in", "--out", "out", "--fromat", "jpg"]);
+        assert_eq!(code, 2);
+        assert!(err.contains("--fromat"), "{err}");
+        assert!(err.contains("batch"), "{err}");
+        let (code, _, err) = run_args(&["batch", "--actions", "a.json", "--in", "in", "--out", "out", "--fromat=jpg"]);
+        assert_eq!(code, 2);
+        assert!(err.contains("--fromat"), "{err}");
+        let (code, _, err) = run_args(&["run", "in.png", "--cmd", "filter.blur.gaussianBlur", "--param", r#"{"radius":3}"#, "--out", "x.png"]);
+        assert_eq!(code, 2);
+        assert!(err.contains("--param"), "{err}");
+    }
+
+    /// Every flag form in `USAGE` passes validation: the failures below are run-time
+    /// errors (exit 1) or success (0), never the usage error (exit 2) an allow-list
+    /// typo would produce. No case reads stdin, binds a port or writes a file.
+    #[test]
+    fn valid_flags_keep_working() {
+        let (code, _, err) = run_args(&["convert", "423-missing.png", "b.png", "--format", "jpg", "--quality", "80"]);
+        assert_eq!(code, 1, "convert space form: {err}");
+        let (code, _, err) = run_args(&["convert", "423-missing.png", "b.png", "--format=jpg"]);
+        assert_eq!(code, 1, "convert = form: {err}");
+        let (code, _, err) = run_args(&["info", "423-missing.png", "--compact"]);
+        assert_eq!(code, 1, "info --compact: {err}");
+        // --params without a preceding --cmd is an engine error, not a usage error.
+        let (code, _, err) = run_args(&["run", "--new", "{}", "--params", "{}"]);
+        assert_eq!(code, 1, "run --new/--params: {err}");
+        // A real command with --format and no --out runs and writes nothing.
+        let (code, _, err) = run_args(&["run", "--new", "{}", "--cmd", "layer.new.layer", "--format", "png"]);
+        assert_eq!(code, 0, "run --cmd/--format: {err}");
+        // --actions= form and --quality: the missing actions file fails before --out is created.
+        let (code, _, err) = run_args(&["batch", "--actions=423-missing.json", "--in", "x", "--out", "423-batch-out", "--quality", "90"]);
+        assert_eq!(code, 1, "batch = form + --quality: {err}");
+        assert!(!Path::new("423-batch-out").exists(), "batch wrote its out dir");
+        let (code, _, _) = run_args(&["commands", "--json"]);
+        assert_eq!(code, 0);
+        let (code, _, _) = run_args(&["commands", "--filter", "423-no-such-command"]);
+        assert_eq!(code, 0);
+        // mcp: a supplied token and token file are refused before any connection is attempted.
+        let (code, _, err) = run_args(&[
+            "mcp",
+            "--bridge",
+            "127.0.0.1:1",
+            "--control-token",
+            "00",
+            "--control-token-file",
+            "423-missing.token",
+            "--automation-read-root",
+            "423-missing-root",
+            "--automation-write-root",
+            "423-missing-root",
+        ]);
+        assert_eq!(code, 1, "mcp flags: {err}");
+        // serve: the missing read root is refused before the session or port starts.
+        let (code, _, err) = run_args(&[
+            "serve",
+            "--port",
+            "abc",
+            "--control-token",
+            "00",
+            "--control-token-file",
+            "423-missing.token",
+            "--automation-read-root",
+            "423-missing-root",
+            "--automation-write-root",
+            "423-missing-root",
+        ]);
+        assert_eq!(code, 1, "serve flags: {err}");
+    }
 }
