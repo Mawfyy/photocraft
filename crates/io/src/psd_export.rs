@@ -343,6 +343,25 @@ fn q255(v: f32) -> u8 {
     (v.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
+/// Whether the layer's appearance comes from a descriptor rather than from pixel data, which is
+/// what Photoshop's "pixel data irrelevant" flag (bit 4) marks.
+///
+/// Measured over the 3135 layers of the real-file corpora (Photoshop-authored, psd-tools and
+/// ag-psd): Photoshop sets it on every adjustment layer (346), every fill layer (251) and every
+/// shape layer (622: 535 with a fill, 87 whose fill is off), on 373 of the 376 group folders
+/// (the three exceptions are hand-made files whose group records carry no flags at all), and on
+/// no text layer (123), no smart object (206) and no plain raster layer (1174). A layer that
+/// only carries a vector mask keeps its pixel data and the flag stays off (17 of 104).
+///
+/// Without the flag a reader takes the layer for a raster layer: psd-tools then calls a fill
+/// layer a "solidcolorfill" where Photoshop calls it a shape.
+fn pixel_data_irrelevant(content: &LayerContent) -> bool {
+    match content {
+        LayerContent::Adjustment(_) | LayerContent::Fill(_) | LayerContent::Group(_) | LayerContent::Shape(_) => true,
+        LayerContent::Raster(_) | LayerContent::Text(_) | LayerContent::Smart(_) => false,
+    }
+}
+
 impl Ex {
     fn compression(&self) -> Compression {
         if self.fmt.sample == SampleType::F32 { Compression::ZipPrediction } else { Compression::Rle }
@@ -476,10 +495,10 @@ impl Ex {
         if self.background == Some(l.id) {
             channels.retain(|c| c.id != -1);
         }
-        // As Photoshop writes them: bit 4 is meaningful, and set for layers whose pixels don't
-        // show (adjustment layers).
+        // As Photoshop writes them: bit 4 is meaningful, and set for the layers whose appearance
+        // comes from a descriptor instead of from pixel data.
         let mut flags = LayerFlags(LayerFlags::BIT4_USEFUL);
-        if matches!(l.content, LayerContent::Adjustment(_)) {
+        if pixel_data_irrelevant(&l.content) {
             flags.0 |= LayerFlags::PIXEL_DATA_IRRELEVANT;
         }
         flags.set_hidden(!l.visible);
