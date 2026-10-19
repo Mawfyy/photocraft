@@ -165,6 +165,7 @@ pub mod pixel_grid;
 pub mod plugin_ui;
 pub mod point_curve;
 pub mod prefs_ui;
+pub mod presence;
 pub mod preset_files_ui;
 pub mod preset_panels;
 pub mod press_menu;
@@ -499,6 +500,9 @@ pub struct Services {
     /// Preferences ▸ General ▸ Beep When Done: the platform's default beep, played when a
     /// background job finishes successfully. `None` in the web build (and in tests).
     pub beep: Option<fn()>,
+    /// Discord Rich Presence: the shell publishes what the user is doing (#4148). The UI calls
+    /// it when the state it shows changes; `None` in the web build and in tests.
+    pub presence: Option<presence::Hook>,
     /// Files delivered asynchronously (web drag-and-drop): drained every frame and opened as
     /// documents.
     pub inbox: Option<Inbox>,
@@ -859,6 +863,8 @@ pub struct PhotocraftApp {
     last_frame_start_ms: f64,
     /// Background job bookkeeping: opening tabs, control replies waiting on a job.
     pub jobs: jobs_ui::JobsUi,
+    /// Discord Rich Presence: what the shell last heard about, and when (#4148).
+    pub presence: presence::Tracker,
     #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
     live_tokens: theme::live::LiveTokens,
 }
@@ -998,6 +1004,7 @@ impl PhotocraftApp {
             min_frame_ms: None,
             last_frame_start_ms: 0.0,
             jobs: Default::default(),
+            presence: Default::default(),
             #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
             live_tokens: theme::live::LiveTokens::from_env(),
         };
@@ -1980,6 +1987,8 @@ impl eframe::App for PhotocraftApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
         self.poll_file_dialog(ctx, Some(frame));
+        // Discord Rich Presence: tell the shell what changed, when the user asked for it (#4148).
+        crate::presence::report(self);
     }
 
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {

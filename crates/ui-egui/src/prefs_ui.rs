@@ -1163,6 +1163,10 @@ fn humanize(key: &str) -> String {
     if key == "gpuMemoryMb" {
         return "GPU Memory (MB, 0 = Automatic)".into();
     }
+    // Discord Rich Presence: the file name is private unless the user asks for it (#4148).
+    if key == "discordRichPresenceFileName" {
+        return "Show the File Name on Discord".into();
+    }
     let mut s = String::new();
     for (i, ch) in key.chars().enumerate() {
         if i == 0 {

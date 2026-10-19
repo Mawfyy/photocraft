@@ -221,6 +221,13 @@ pub struct General {
     pub zoom_resizes_windows: bool,
     pub use_legacy_free_transform: bool,
     pub auto_show_home_screen: bool,
+    /// Show what PhotoCraft is doing on Discord (the "Rich Presence" status): the open file's
+    /// name, the tool and the document size. Off by default: the file name is shown to the
+    /// user's Discord friends (#4148).
+    pub discord_rich_presence: bool,
+    /// Show the open file's name on the Discord status. Off by default: the name is private
+    /// unless the user asks for it, and a path never leaves the machine (#4148).
+    pub discord_rich_presence_file_name: bool,
 }
 
 impl Default for General {
@@ -237,6 +244,8 @@ impl Default for General {
             zoom_resizes_windows: false,
             use_legacy_free_transform: false,
             auto_show_home_screen: true,
+            discord_rich_presence: false,
+            discord_rich_presence_file_name: false,
         }
     }
 }
