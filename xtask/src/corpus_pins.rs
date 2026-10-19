@@ -16,6 +16,10 @@ use crate::pinned::{PinnedCorpus, Upstream};
 pub const PHOTOCRAFT_CORPUS_COMMIT: &str = "f5b1178cab15309e05b7b504545df3c701f6d8fd";
 /// https://github.com/psd-tools/psd-tools (MIT): `tests/psd_files` (main, 2026-10-05).
 pub const PSD_TOOLS_COMMIT: &str = "96eb134c17b2c65edf4c4151c0f00b802ada86c2";
+/// The version of the third-party PSD reader the export acceptance test uses (psd-tools, MIT,
+/// the same project as the corpus above): `cargo xtask psd-accept --setup` installs it, and the
+/// CI corpus job installs it before the acceptance test.
+pub const PSD_TOOLS_PYTHON: &str = "1.25.0";
 /// https://github.com/Agamnentzar/ag-psd (MIT): `test/` (master, 2026-07-02).
 pub const AG_PSD_COMMIT: &str = "387049670cb89b88fb8fe1b7c01aeacf98dd2e3b";
 /// https://github.com/tbraun96/heic-rs (MIT OR Apache-2.0): `tests/fixtures` at the v0.1.1 tag, the

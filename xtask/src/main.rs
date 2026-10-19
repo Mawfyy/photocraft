@@ -10,6 +10,7 @@ mod ico;
 mod layers;
 mod perf;
 mod pinned;
+mod psd_accept;
 mod scorecard;
 mod sha256;
 mod stats;
@@ -36,6 +37,10 @@ commands:
                   --local takes corpus/photoshop from the photocraft-corpus authoring clone
   stats [--exact] count tests and lines per crate (--exact: ask the test harness via `-- --list`)
   parity          Photoshop menu parity; rewrites docs/parity-checklist.md
+  psd-accept [--setup | --setup-only] [-- <test args>]
+                  open our PSD exports in an independent reader (psd-tools) and check that it
+                  sees the layers we wrote; --setup installs the pinned reader into .venv-psd/
+                  first, --setup-only installs it and stops (the CI corpus job)
   i18n-coverage   report stable UI translation coverage for registered languages
   perf [--quick] [--update-baseline] [--threshold PCT] [--bench NAME]... [--skip-build] [--reuse]
                   run the release benches, merge them by scenario id into target/perf/results.json,
@@ -59,6 +64,7 @@ fn main() -> ExitCode {
         Some("test-corpus") => corpus::test_cmd(&rest),
         Some("stats") => stats::run(&root(), rest.contains(&"--exact")),
         Some("parity") => cmd_parity(),
+        Some("psd-accept") => psd_accept::run_cmd(&rest),
         Some("i18n-coverage") => i18n_coverage::run(&root()),
         Some("perf") => perf::run(&root(), &rest),
         Some("scorecard") => scorecard::run(&root(), &rest),
@@ -90,7 +96,8 @@ pub fn cargo() -> Command {
     c
 }
 
-fn run(mut cmd: Command, what: &str) -> Result<(), String> {
+/// Runs a command, reporting what it was.
+pub fn run(mut cmd: Command, what: &str) -> Result<(), String> {
     eprintln!("$ {what}");
     let status = cmd.status().map_err(|e| format!("{what}: failed to spawn: {e}"))?;
     if status.success() { Ok(()) } else { Err(format!("{what}: exited with {status}")) }
