@@ -146,6 +146,8 @@ allocations for padded channels return an error on failure.
 
 `tests/corpus.rs` walks `corpus/psd/**/*.{psd,psb}` at the workspace root when that directory exists. For each file it asserts that parsing succeeds and the file round-trips byte for byte, and it prints a result per file. Without the directory it skips silently.
 
+The files PhotoCraft *writes* are checked by a third-party reader: `crates/io/tests/psd_acceptance.rs` opens our exports in [psd-tools](https://github.com/psd-tools/psd-tools) (MIT) and compares the layer tree and every layer's kind with ours (`cargo xtask psd-accept`).
+
 A `cargo-fuzz` skeleton lives in `fuzz/`. It is its own workspace and is excluded from photocraft's. Run it with `cargo +nightly fuzz run parse` (or `descriptor`) from `crates/psd`.
 
 ## Spec ambiguities and decisions

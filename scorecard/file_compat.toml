@@ -176,9 +176,9 @@ note = "EXR: corpus/exr (the OpenEXR deep test images, pinned) is read by codecs
 [[item]]
 id = "FILE-216-4"
 target = "Exports re-open in a third-party oracle editor"
-status = "missing"
+status = "partial"
 issue = 216
-note = "The round trip is our export -> our import"
+note = "crates/io/tests/psd_acceptance.rs opens our exports in psd-tools (MIT, the reference implementation of the format outside Adobe; the version is pinned in xtask/src/corpus_pins.rs and installed by `cargo xtask psd-accept --setup` and by the CI corpus job): 735 re-saved corpus files and the documents we build open, and the reader and we agree on the size, the layer tree (the names, their order, the group nesting, the visibility) and the kind of every layer; a re-saved corpus file still looks to the reader like the file it came from. Photoshop itself is still the only real oracle (a human opening the exports on the owner's Mac), and no other third-party reader is checked yet"
 
 [[item]]
 id = "FILE-216-5"

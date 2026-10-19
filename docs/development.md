@@ -525,6 +525,23 @@ scripts/fetch-corpus.sh            # the same as cargo xtask corpus --all
   the manifests. A download happens only when a pin changes; otherwise the cache restores in seconds
   and is re-verified (sha256) before the tests run. Fork PRs read the base branch's cache.
 
+**A third-party reader opens our exports** (`FILE-216-4`).
+
+Our own reader is not enough to claim Photoshop compatibility: a file only we can read is a file a
+user cannot open. `crates/io/tests/psd_acceptance.rs` writes PSD files with PhotoCraft and opens
+them with [psd-tools](https://github.com/psd-tools/psd-tools) (MIT), the reference implementation
+of the format outside Adobe. It checks that the reader and we agree on the size, the layer tree
+(names, order, group nesting, visibility) and the kind of every layer, and — for the corpora —
+that a file re-saved through PhotoCraft still looks to the reader like the file it came from.
+
+```sh
+cargo xtask psd-accept --setup   # install the pinned reader into .venv-psd/, then run the check
+cargo xtask psd-accept            # run the check with the reader that is installed
+```
+
+The test skips itself when no reader is installed (it prints SKIP); the CI `corpus` job installs
+the pinned one (`xtask/src/corpus_pins.rs`) before the corpus tests, so the gate runs there.
+
 **Our own corpus: [photocraft-corpus](https://github.com/storytold/photocraft-corpus).**
 
 - **Authoring clone:** a normal git clone, `git clone git@github.com:storytold/photocraft-corpus.git`,
