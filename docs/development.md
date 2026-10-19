@@ -84,6 +84,29 @@ CRAFT_FONTS_DIR="$PWD/../craft-fonts" cargo test --workspace     # runs the Japa
 
 On Windows and Linux the first PhotoCraft holds an exclusive lock on `instance.lock` in the config directory and listens on a loopback port named in `instance.json` (with a fresh 256-bit token; the file is 0600 on Unix). A later launch hands its file arguments there and exits, so files opened from Explorer or a file manager become tabs in the running window (#3708). The primary answers `ok` only once its UI has taken the files; a launch that gets anything else (the primary is starting, hung or closing) keeps retrying the lock for up to 10 s, becoming the primary itself once the old one lets go, and then starts a separate instance, so a file is never acknowledged and lost. When the event loop ends (and before the CPU-compatibility relaunch) the primary refuses new files and frees the lock. It applies only with the per-user settings folder: a portable copy (`PhotoCraftData` beside the executable) or `PHOTOCRAFT_CONFIG_DIR` may be shared between users, so those launches run separately. So do `--new-instance` (or `PHOTOCRAFT_NEW_INSTANCE=1`), every `--control` launch, and launches given a per-process option (`--safe-gpu`, `--present-mode`, `--frame-latency`, `--stroke-trace`, `--in-window-menus`, `--automation-*-root`). A `cargo run` while an installed PhotoCraft is running forwards to it: pass `--new-instance` or set `PHOTOCRAFT_CONFIG_DIR`. macOS gets the same behaviour from LaunchServices (`apple_events.rs`). On native Wayland the running window can't bring itself forward (that takes the launcher's `XDG_ACTIVATION_TOKEN`, and winit 0.30 can't activate an existing window with one), so it asks for attention instead and the taskbar highlights it; X11, XWayland and Windows bring it to the front. Flatpak needs its own follow-up (#1540). Code: `apps/photocraft/src/single_instance.rs`.
 
+## Discord Rich Presence
+
+PhotoCraft can show what the user is doing on their Discord status: the tool, the document size
+and the zoom, and — only if the user asks for it — the open file's name. It is off by default
+(Preferences ▸ General ▸ **Discord Rich Presence**), and the file name is private unless
+**Show the File Name on Discord** is on as well. A path never leaves the machine: only the
+name without its directory is published, and only when the user asked for it (#4148; the same
+rule the sibling apps follow).
+
+The status goes over Discord's local IPC socket — a Unix socket on Linux and macOS, a named
+pipe on Windows — which the Discord client creates when it runs. The desktop shell owns that
+connection (`apps/photocraft/src/presence.rs`); the UI only reports what changed
+(`crates/ui-egui/src/presence.rs`), and the browser build has no socket to talk to.
+
+A Discord *application id* is needed: create an application in the Discord developer portal and
+give PhotoCraft its id, either in `PHOTOCRAFT_DISCORD_APP_ID` or in `DISCORD_APP_ID` in
+`presence.rs` for a build that ships with one. Without an id the feature stays off and nothing
+else changes. `LARGE_IMAGE_KEY` in the same file names the asset uploaded for the card's image;
+empty means the application's own icon.
+
+`PHOTOCRAFT_DISCORD_IPC` names one socket instead of the usual ten, which is how the test drives
+the client against a stand-in for Discord (`cargo test -p photocraft presence`).
+
 ## Graphics startup and device loss
 
 `--safe-gpu` starts with the CPU renderer for one launch (no GPU canvas; a software adapter for the window where the platform has one: WARP on Windows, llvmpipe over GL on Linux). Before creating the wgpu device the app writes and locks `gpu-starting.json` in the config directory; it clears it once the first frames have rendered. A launch that finds an unlocked marker knows the previous start died inside the graphics driver (#4) and uses the next safer backend (Windows: Vulkan → DX12 → CPU; Linux: Vulkan → GL → CPU; macOS: Metal → CPU), remembering a working hardware backend in `performance.gpuBackend` (Preferences › Performance › GPU Backend, with **Reset GPU Backend**). CPU recovery is temporary until **Keep Using CPU** is chosen in the recovery dialog; dismissing the dialog or quitting without a choice preserves the previous GPU preference (#3483). With `auto`, Intel adapters on Windows use DX12. Help › System Info shows the adapter, backend, driver and fallback state.
@@ -128,6 +151,8 @@ By default PhotoCraft's own crates log at `info` and everything else at `warn`. 
 | `PHOTOCRAFT_FRAME_LATENCY=1` (or `--frame-latency`) | Frames the swap chain may queue, 1 to 3 (wgpu's GL backend ignores it). For latency comparisons; shown in the stroke trace |
 | `PHOTOCRAFT_PRINT_PORTAL=1` | Linux: File › Print always opens the system print dialog (the XDG print portal) instead of talking to CUPS; `0` never does. See [printing](printing.md). |
 | `PHOTOCRAFT_THEME_FILE=tokens.json` | **Debug builds only:** live design-token overrides, re-read on change |
+| `PHOTOCRAFT_DISCORD_APP_ID` | The Discord application id the Rich Presence status is published under (see [Discord Rich Presence](#discord-rich-presence)) |
+| `PHOTOCRAFT_DISCORD_IPC` | The Discord IPC socket to talk to, instead of the usual ten (the test's stand-in for Discord) |
 
 ### Live design tokens
 
