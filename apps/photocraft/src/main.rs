@@ -59,6 +59,10 @@ mod linux_libs;
 mod logging;
 mod monitor_profile;
 mod photoshop_settings;
+// Discord Rich Presence: the shell publishes what the user is doing (#4148). Native only: the
+// browser build has no local socket to talk to.
+#[cfg(not(target_arch = "wasm32"))]
+mod presence;
 // Save As through the desktop portal, which reports the file type picked (#6121).
 #[cfg(target_os = "linux")]
 mod portal_save;

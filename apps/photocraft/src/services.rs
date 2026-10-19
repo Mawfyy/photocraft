@@ -554,6 +554,10 @@ pub fn native(automation: Option<photocraft_automation::AuthorizedWorkspace>) ->
         inbox: None,
         open_url: Some(Box::new(|url: &str| open::that(url).map_err(|e| e.to_string()))),
         beep: Some(platform_beep),
+        // Discord Rich Presence: the shell publishes what the user is doing (#4148). `None`
+        // until a Discord application id is configured.
+        #[cfg(not(target_arch = "wasm32"))]
+        presence: crate::presence::install(),
         clipboard_set_image: Some({
             let clip = clip.clone();
             Box::new(move |w: u32, h: u32, px: &[u8]| {

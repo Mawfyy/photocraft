@@ -36,6 +36,9 @@ log = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rfd = { workspace = true }
+# Discord Rich Presence (`presence.rs`): the local IPC socket, a current-thread runtime and a
+# channel. Already in Cargo.lock (photocraft-automation); pinned to the same version.
+tokio = { version = "1", features = ["rt", "net", "io-util", "time", "sync"] }
 arboard = { version = "3.6", features = ["wayland-data-control"] }
 open = "5"
 # Reads the saved window layout (eframe persistence) to drop values that would abort startup.
